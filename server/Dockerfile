@@ -1,0 +1,24 @@
+FROM alpine
+
+RUN apk add nodejs npm 
+
+ARG OPENAI_API_KEY
+ARG IDEOGRAM_API_KEY
+ARG MONGO_URI
+ARG CLIENT_URL
+
+ENV OPENAI_API_KEY
+ENV IDEOGRAM_API_KEY
+ENV MONGO_URI
+ENV CLIENT_URL
+
+WORKDIR /app
+
+COPY package*.json .
+RUN npm ci
+
+COPY . .
+
+EXPOSE 8000
+
+CMD [ "npm" , "start" ]

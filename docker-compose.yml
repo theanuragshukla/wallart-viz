@@ -1,0 +1,24 @@
+version: '3'
+services:
+    client:
+      container_name: 'wallart_ui'
+      build:
+        dockerfile: Dockerfile
+        context: ./client
+      ports:
+        - 3003:80
+      env_file: ./client/.env
+
+    server:
+      container_name: 'wallart_server'
+      build:
+        args:
+          MONGO_URL: ${MONGO_URL}
+          OPENAI_API_KEY: ${OPENAI_API_KEY}
+          IDEOGRAM_API_KEY: ${IDEOGRAM_API_KEY}
+          CLIENT_URL: http:40.80.31.107:3003
+        dockerfile: Dockerfile
+        context: ./server/
+      ports:
+        - 8002:5000
+      env_file: ./server/.env
