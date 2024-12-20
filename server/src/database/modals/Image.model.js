@@ -36,9 +36,17 @@ const ImagesSchema = new mongoose.Schema({
     type: Number,
     default: 1,
   },
-  vision_description: {
+  vision: {
     type: String,
     default: "",
+  },
+  description: {
+    type: String,
+    default: "",
+  },
+  status: {
+    type: String,
+    default: "processing",
   },
   arts: {
     type: [{

@@ -5,23 +5,28 @@ const path = require("path");
 const fs = require("fs");
 const { v4: uuidv4 } = require("uuid");
 const cors = require("cors");
+const SocketIO = require("./socket");
 
-require("./queues/workers/visionWorker");
-require("./queues/workers/imageGenWorker");
 const ConnectMongo = require("./database/connection");
 const imgVisionQueue = require("./queues/ImgVisionQueue");
 const { default: uploadedImages } = require("./database/modals/Image.model");
 const { default: mongoose } = require("mongoose");
 
+const app = express();
+const http = require("http").createServer(app);
+
 const PORT = process.env.PORT || 5000;
 const UID = "admin";
 
-const app = express();
-app.use(cors({
-  origin: ['http://localhost:3000'],
-  credentials: true,
-}));
-new ConnectMongo();
+const server = http.listen(PORT, () => {
+  new ConnectMongo();
+  console.log(`>>> Server is running on http://localhost:${PORT}`);
+});
+
+const io = SocketIO.getInstance(server);
+
+require("./queues/workers/visionWorker")({io})
+require("./queues/workers/imageGenWorker")({io})
 
 const UPLOADS_DIR = path.join(__dirname, "uploads");
 if (!fs.existsSync(UPLOADS_DIR)) {
@@ -40,10 +45,16 @@ const storage = multer.diskStorage({
 
 const upload = multer({ storage });
 
+app.use(
+  cors({
+    origin: [process.env.CLIENT_URL, "http://localhost:3000"],
+    credentials: true,
+  })
+);
 app.use(express.json());
 app.use("/uploads", express.static(UPLOADS_DIR));
 
-app.post("/upload", upload.array("images", 10), (req, res) => {
+app.post("/upload", upload.array("images", 20), (req, res) => {
   if (!req.files || req.files.length === 0) {
     return res
       .status(400)
@@ -62,6 +73,23 @@ app.post("/upload", upload.array("images", 10), (req, res) => {
   });
 });
 
+app.post('/update_pos', async (req, res) => {
+  const { id, pos_csv } = req.body;
+  try {
+    await uploadedImages.findByIdAndUpdate(id, { pos_csv });
+    res.json({
+      status: true,
+      message: "Position updated successfully.",
+    });
+  } catch (error) {
+    console.error(">>> Error:", error);
+    res.status(500).json({
+      status: false,
+      message: "An error occurred while updating position.",
+    });
+      }
+});
+
 app.post("/process", async (req, res) => {
   const { images, masterPrompt, pos_strs } = req.body;
   const imgQueueData = await Promise.all(
@@ -72,7 +100,7 @@ app.post("/process", async (req, res) => {
         .filter((e) => e !== "null");
 
       //NOTE: assuming the csv data is valid
-      const count = xy_pos.length / 2;
+     const count = xy_pos.length / 2;
       const imgObj = await uploadedImages.create({
         uid: UID,
         masterPrompt,
@@ -89,6 +117,7 @@ app.post("/process", async (req, res) => {
         prompt: imgObj.masterPrompt,
         img_path: imgObj.img_path,
         id: imgObj._id,
+        uid: imgObj.uid
       });
     })
   );
@@ -98,32 +127,29 @@ app.post("/process", async (req, res) => {
   });
 });
 
-app.post('/filter', async (req, res) => {
+app.post("/filter", async (req, res) => {
   try {
     const { id, page = 1, limit = 10 } = req.body;
     const filter = {
       uid: UID,
-      ...(id ? { _id: mongoose.Types.ObjectId.createFromHexString(id)} : {}),
-    }
-    const results = await uploadedImages.find(filter)
+      ...(id ? { _id: mongoose.Types.ObjectId.createFromHexString(id) } : {}),
+    };
+    const results = await uploadedImages
+      .find(filter)
       .skip((page - 1) * limit)
       .limit(limit);
-    
+
     res.json({
       status: true,
       data: results,
       timestamp: new Date().toISOString(),
     });
   } catch (error) {
-    console.error('>>> Error:', error);
+    console.error(">>> Error:", error);
     res.status(500).json({
       status: false,
-      data: 'An error occurred while fetching data.',
+      data: "An error occurred while fetching data.",
       timestamp: new Date().toISOString(),
     });
   }
-});
-
-app.listen(PORT, () => {
-  console.log(`>>> Server is running on http://localhost:${PORT}`);
 });
