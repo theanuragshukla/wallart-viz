@@ -35,6 +35,9 @@ export const uploadImages = (values) => {
     },
   }));
 };
+export const updatePos = (values) => {
+  return reqModal(() => getClient().post("/update_pos", values));
+};
 
 export const submitForProcess = (values) => {
   return reqModal(() => getClient().post("/process", values));

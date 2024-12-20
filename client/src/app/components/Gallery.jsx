@@ -1,7 +1,22 @@
-import React, { useState, useEffect } from "react";
+import {
+    Badge,
+    Card,
+    CardBody,
+    CardFooter,
+    Grid,
+    Heading,
+    Image,
+    Spacer,
+    Stack,
+    Text,
+} from "@chakra-ui/react";
+import React, { useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { ROUTES } from "../../constants";
+import { connectSocket } from "../../data/socket";
 import { filterWalls } from "../../data/user";
+import Pagination from "../common/Pagination";
+const BASE_URL = process.env.REACT_APP_SERVER_URL || "http://localhost:5000";
 
 const Gallery = () => {
     const [data, setData] = useState([]);
@@ -9,9 +24,10 @@ const Gallery = () => {
     const [limit, setLimit] = useState(10);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState(null);
+    const [forceRefresh, setForceRefresh] = useState(0);
     const navigate = useNavigate();
 
-    const fetchData = async () => {
+    const fetchData = useCallback(async () => {
         setLoading(true);
         setError(null);
         try {
@@ -30,68 +46,99 @@ const Gallery = () => {
         } finally {
             setLoading(false);
         }
-    };
+    }, [page, limit, forceRefresh]);
 
     useEffect(() => {
         fetchData();
-    }, [page, limit]);
+    }, [fetchData, forceRefresh]);
+
+    useEffect(() => {
+        const socket = connectSocket();
+        socket.on("img_status", () => {
+            setForceRefresh(e=>e+1);
+        });
+        return () => {
+            socket.disconnect();
+        };
+    }, []);
 
     return (
         <div>
-            <h1>Uploaded Images</h1>
+            <Heading size="lg" mb="6">
+                Gallery of Walls
+            </Heading>
 
             {loading && <p>Loading...</p>}
 
             {error && <p style={{ color: "red" }}>{error}</p>}
 
             {!loading && !error && data.length > 0 && (
-                <div>
+                <Grid
+                    templateColumns={{
+                        base: "repeat(1, 1fr)",
+                        md: "repeat(2, 1fr)",
+                        lg: "repeat(3, 1fr)",
+                        xl: "repeat(4, 1fr)",
+                    }}
+                    gap={6}
+                    alignItems="center"
+                    justifyContent="center"
+                    w="100%"
+                >
                     {data.map((item, index) => (
-                        <div
-                            key={item._id}
-                            style={{
-                                border: "1px solid #ccc",
-                                padding: "16px",
-                                marginBottom: "16px",
-                            }}
-                            onClick={() => { navigate(`${ROUTES.VISSUALIZE}/${item._id}`)}}
+                        <Card
+                            onClick={() =>
+                                navigate(`${ROUTES.VISSUALIZE}/${item._id}`)
+                            }
+                            cursor="pointer"
                         >
-                            <h3>UID: {item.uid}</h3>
-                            <img
-                                src={`http://localhost:5000/uploads/${item.img_path}`}
-                                alt="Uploaded"
-                                style={{ width: "100px", height: "100px" }}
-                            />
-                        </div>
+                            <CardBody>
+                                <Image
+                                    src={`${BASE_URL}/uploads/${item.img_path}`}
+                                    alt="Green double couch with wooden legs"
+                                    borderRadius="lg"
+                                    height="200px"
+                                    objectFit="cover"
+                                    w="100%"
+                                />
+                                <Stack mt="6" spacing="3">
+                                    <Heading size="md">
+                                        {item.pos_csv.split(",")[0].trim() ||
+                                            "Unnamed wall"}
+                                    </Heading>
+                                    <Text noOfLines={3}>
+                                        {item.vision ||
+                                            "No Description Available"}
+                                    </Text>
+                                    <Text color="blue.600" fontSize="2xl">
+                                        {item.art_count || 0} arts
+                                    </Text>
+                                </Stack>
+                            </CardBody>
+                            <CardFooter>
+                                <Badge
+                                    colorScheme={
+                                        item.status === "completed"
+                                            ? "green"
+                                            : item.status.includes("failed")
+                                              ? "red"
+                                              : "yellow"
+                                    }
+                                >
+                                    {item.status}
+                                </Badge>
+                            </CardFooter>
+                        </Card>
                     ))}
-                </div>
+                </Grid>
             )}
-
-            <div>
-                <button
-                    onClick={() => setPage((prev) => Math.max(prev - 1, 1))}
-                    disabled={page === 1}
-                >
-                    Previous
-                </button>
-                <span> Page {page} </span>
-                <button onClick={() => setPage((prev) => prev + 1)}>
-                    Next
-                </button>
-            </div>
-
-            <div>
-                <label htmlFor="limit">Items per page: </label>
-                <select
-                    id="limit"
-                    value={limit}
-                    onChange={(e) => setLimit(Number(e.target.value))}
-                >
-                    <option value={5}>5</option>
-                    <option value={10}>10</option>
-                    <option value={20}>20</option>
-                </select>
-            </div>
+            <Spacer h={8} />
+            <Pagination
+                page={page}
+                setPage={setPage}
+                limit={limit}
+                setLimit={setLimit}
+            />
         </div>
     );
 };

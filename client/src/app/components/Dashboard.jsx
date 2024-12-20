@@ -7,26 +7,37 @@ import {
     HStack,
     Image,
     Text,
-    Table,
-    Thead,
-    Tbody,
-    Tr,
-    Th,
-    Td,
     IconButton,
-    TableContainer,
     useToast,
+    Textarea,
 } from "@chakra-ui/react";
 import { CloseIcon } from "@chakra-ui/icons";
 import { submitForProcess, uploadImages } from "../../data/user";
 
 const Dashboard = () => {
     const [images, setImages] = useState([]);
-    const [masterPrompt, setMasterPrompt] = useState("");
+    const [masterPrompt, setMasterPrompt] =
+        useState(`You are an interior designer working with a client to choose art for their home.
+For the wall photo attached:  
+**Vision:**  
+- Develop a detailed vision about what kind of art would fit on this wall.  
+- Take into consideration the room's colors.  
+- Take into consideration style, organization, furniture, anything you can learn about the space or the people living there.  
+
+**Based on the vision, give me:**  
+- A short, one-sentence user-facing summary about what kind of art would fit on this wall. Use simple, conversational language, like you would talk to a friend. Assume I know nothing about art.  
+- **Art Sets:**  
+  - Define three specific art-sets of three art pieces each that fit your vision.  
+  - Depending on the wall space and frame size, sometimes we will want to use only one or two pieces out of the set of three. Therefore:  
+    - The first two should also work together as a standalone set.  
+    - The 1st piece should be the main or best piece of the set that can be hanged alone on the wall.  
+  - Give each set a short one-word title.  
+  - For each art piece, write a full, descriptive prompt that I can feed to Ideogram to create the piece you envision.
+
+`);
     const [csvData, setCsvData] = useState([]);
     const toast = useToast();
 
-    // Handle image upload
     const handleImageUpload = (event) => {
         const files = Array.from(event.target.files);
         const imageUrls = files.map((file) => ({
@@ -36,38 +47,30 @@ const Dashboard = () => {
         setImages((prevImages) => [...prevImages, ...imageUrls]);
     };
 
-    // Handle CSV file upload
     const handleCsvUpload = (event) => {
         const file = event.target.files[0];
         const reader = new FileReader();
 
         reader.onload = (e) => {
             const text = e.target.result;
-            const rows = text.split("\n").map((row) => row.split(","));
-            const formattedData = rows.map((row) =>
-                row.map((cell) => cell.trim())
+            const rows = text.split("\n").map((row) =>
+                row
+                    .split(",")
+                    .map((cell) => cell.trim())
+                    .join(",")
             );
-            setCsvData(formattedData);
+            setCsvData(rows);
         };
 
         reader.readAsText(file);
     };
 
-    // Handle CSV data editing
-    const handleCsvEdit = (rowIndex, colIndex, value) => {
-        const updatedData = [...csvData];
-        updatedData[rowIndex][colIndex] = value;
-        setCsvData(updatedData);
-    };
-
-    // Remove an uploaded image
     const removeImage = (index) => {
         const updatedImages = [...images];
         updatedImages.splice(index, 1);
         setImages(updatedImages);
     };
 
-    // Handle form submission
     const handleSubmit = async () => {
         if (!masterPrompt) {
             toast({
@@ -84,8 +87,8 @@ const Dashboard = () => {
         images.forEach((image) => formData.append("images", image.file));
 
         try {
-            const {status, data, msg} = await uploadImages(formData);
-            if(!status){
+            const { status, data, msg } = await uploadImages(formData);
+            if (!status) {
                 toast({
                     title: "Error",
                     description: msg || "An error occurred.",
@@ -97,8 +100,8 @@ const Dashboard = () => {
             }
             const result = await submitForProcess({
                 masterPrompt,
-                images: data.map(o=>o.url),
-                pos_strs: csvData.map(row => row.join(",")).filter(Boolean),
+                images: data.map((o) => o.url),
+                pos_strs: csvData.filter(Boolean),
             });
 
             if (result.status) {
@@ -132,19 +135,19 @@ const Dashboard = () => {
 
     return (
         <VStack spacing={5} p={5}>
-            {/* Master Prompt Input */}
             <Box w="100%">
                 <Text fontWeight="bold" mb={2}>
                     Master Prompt
                 </Text>
-                <Input
+                <Textarea
                     placeholder="Enter a master prompt for all images"
                     value={masterPrompt}
                     onChange={(e) => setMasterPrompt(e.target.value)}
+                    noOfLines={10}
+                    minH="250px"
                 />
             </Box>
 
-            {/* Image Upload Section */}
             <Box w="100%">
                 <Text fontWeight="bold" mb={2}>
                     Upload Images
@@ -166,7 +169,7 @@ const Dashboard = () => {
                         >
                             <Image
                                 src={image.preview}
-                                boxSize="100px"
+                                boxSize="200px"
                                 objectFit="cover"
                             />
                             <IconButton
@@ -182,7 +185,6 @@ const Dashboard = () => {
                 </HStack>
             </Box>
 
-            {/* CSV Upload Section */}
             <Box w="100%">
                 <Text fontWeight="bold" mb={2}>
                     Upload CSV
@@ -190,52 +192,23 @@ const Dashboard = () => {
                 <Input type="file" accept=".csv" onChange={handleCsvUpload} />
             </Box>
 
-            {/* CSV Visualization and Editing */}
             <Box w="100%">
                 <Text fontWeight="bold" mb={2}>
                     CSV Data
                 </Text>
                 {csvData.length > 0 ? (
-                    <TableContainer maxHeight="300px" overflowY="auto">
-                        <Table variant="striped" colorScheme="teal" size="sm">
-                            <Thead>
-                                <Tr>
-                                    {csvData[0].map((_, colIndex) => (
-                                        <Th key={colIndex}>
-                                            Column {colIndex + 1}
-                                        </Th>
-                                    ))}
-                                </Tr>
-                            </Thead>
-                            <Tbody>
-                                {csvData.map((row, rowIndex) => (
-                                    <Tr key={rowIndex}>
-                                        {row.map((cell, colIndex) => (
-                                            <Td key={`${rowIndex}-${colIndex}`}>
-                                                <Input
-                                                    size="sm"
-                                                    value={cell}
-                                                    onChange={(e) =>
-                                                        handleCsvEdit(
-                                                            rowIndex,
-                                                            colIndex,
-                                                            e.target.value
-                                                        )
-                                                    }
-                                                />
-                                            </Td>
-                                        ))}
-                                    </Tr>
-                                ))}
-                            </Tbody>
-                        </Table>
-                    </TableContainer>
+                    <Textarea
+                        placeholder="CSV Data"
+                        value={csvData.join("\n")}
+                        onChange={(e) => setCsvData(e.target.value.split("\n"))}
+                        noOfLines={10}
+                        minH="150px"
+                    />
                 ) : (
                     <Text>No CSV data available</Text>
                 )}
             </Box>
 
-            {/* Submit Button */}
             <Button colorScheme="blue" onClick={handleSubmit} width="100%">
                 Submit
             </Button>

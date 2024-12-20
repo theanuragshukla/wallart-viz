@@ -3,10 +3,7 @@ import {
     Icon,
     Box,
     Flex,
-    Input,
     Avatar,
-    InputGroup,
-    InputLeftElement,
     IconButton,
     useColorModeValue,
     useDisclosure,
@@ -17,7 +14,7 @@ import {
     Spacer,
 } from "@chakra-ui/react";
 
-import { FiMenu, FiSearch } from "react-icons/fi";
+import { FiMenu } from "react-icons/fi";
 import { FaBell } from "react-icons/fa";
 import Logo from "../common/Logo";
 import { Outlet, useNavigate } from "react-router-dom";
@@ -25,7 +22,6 @@ import { SIDEBAR_ROUTES } from "../../constants";
 
 export default function DashLayout() {
     const sidebar = useDisclosure();
-    const integrations = useDisclosure();
     const color = useColorModeValue("gray.600", "gray.300");
     const navigate = useNavigate();
 
